@@ -1,0 +1,287 @@
+{$skladi = shopCustom::getFullStoreInformation()}
+
+<!-- Подключите jq-selectbox -->
+{literal}
+<script type="text/javascript" src="https://api-maps.yandex.ru/2.1/?apikey=bd89c778-4b93-46c7-9378-1d924f036f5b&lang=ru_RU" async=""></script>
+{/literal}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remodal/1.1.1/remodal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remodal/1.1.1/remodal-default-theme.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/remodal/1.1.1/remodal.min.js"></script>
+
+<button class="openMapModal" id="openMapModal">
+    {literal}
+        <svg class="feather feather-map-pin" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>    
+    {/literal}
+</button>
+
+<div id="cityMapModal" class="remodal" data-remodal-id="cityMapModal">
+    <div class="selected-city" id="selected-city">
+        <span></span>
+        <div class="selected-city__reset" id="selected-city-reset">
+            &#x2715;
+        </div>
+    </div>
+    <button data-remodal-action="close" class="remodal-close"></button>
+    <div class="modal-content">
+        <div class="tab-btn__list">
+            <div class="tab-btn__item active">Выбрать из списка</div>
+            <div class="tab-btn__item">Выбрать на карте</div>
+        </div>
+        <div class="tab-content__list">
+            <div class="tab-content__item select__list">
+                <div class="select__item custom-select" id="citySelectContainer">
+                    <div class="select-selected">Выберите город</div>
+                    <div class="select-items select-hide">
+                        {foreach key=city_name item=stores from=$skladi}
+                            <div data-value="{$city_name}">{$city_name}</div>
+                        {/foreach}
+                    </div>
+                </div>
+                <div class="select__item" id="storesContainer"></div>
+            </div>
+            <div class="tab-content__item" style="display: none;">
+                <div id="map" class="modal-map"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{literal}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            class StoreMap {
+                constructor(mapElementId, citySelectId, storesContainerId, modalId) {
+                    this.mapElementId = mapElementId;
+                    this.citySelectId = citySelectId;
+                    this.storesContainerId = storesContainerId;
+                    this.map = null;
+                    this.modalId = modalId;
+                    this.selectedCityBlock = document.getElementById('selected-city');
+                    this.selectedCitySpan = this.selectedCityBlock.querySelector('span');
+                    this.selectedCityReset = this.selectedCityBlock.querySelector('#selected-city-reset');
+                    this.citySelectContainer = document.getElementById('citySelectContainer');
+                    this.citySelectSelected = this.citySelectContainer.querySelector('.select-selected');
+                    this.citySelectItems = this.citySelectContainer.querySelector('.select-items');
+                    this.storesContainer = document.getElementById(this.storesContainerId);
+                    {/literal}
+                    this.skladi = {json_encode($skladi)};
+                    {literal}
+                    this.placemarks = [];
+                    this.init();
+                }
+
+                init() {
+                    this.initModal();
+                    this.initCitySelect();
+                    this.initTabs();
+                    this.initSelectedCityReset();
+                }
+
+                initMap() {
+                    if (!this.map) {
+                        this.map = new ymaps.Map(this.mapElementId, {
+                            center: [55.76, 37.64], // Координаты центра карты
+                            zoom: 10
+                        });
+
+                        // Убедитесь, что карта обновляет свои размеры
+                        this.map.container.fitToViewport();
+                    }
+                }
+
+                updateMapMarkers(stores) {
+                    this.clearPlacemarks();
+                    const coords = [];
+
+                    stores.forEach(store => {
+                        const lat = parseFloat(store.latitude_magazin);
+                        const lon = parseFloat(store.longitude_magazin);
+                        coords.push([lat, lon]);
+                        this.createPlacemark(lat, lon, store.magazin, store.grafik, store.id);
+                    });
+
+                    if (coords.length) {
+                        const bounds = ymaps.util.bounds.fromPoints(coords);
+                        this.map.setBounds(bounds, {
+                            checkZoomRange: true,
+                            duration: 300
+                        });
+                    }
+                }
+
+                initModal() {
+                    const remodalInst = $(`[data-remodal-id=${this.modalId}]`).remodal();
+                    $('#openMapModal').on('click', function() {
+                        remodalInst.open();
+                    });
+                }
+
+                initCitySelect() {
+                    this.citySelectSelected.addEventListener('click', () => {
+                        this.citySelectItems.classList.toggle('select-hide');
+                        this.citySelectSelected.classList.toggle('select-arrow-active');
+                    });
+
+                    this.citySelectItems.addEventListener('click', (event) => {
+                        const selectedCity = event.target.getAttribute('data-value');
+                        this.citySelectSelected.innerText = event.target.innerText;
+                        this.selectedCitySpan.innerText = event.target.innerText;
+                        this.selectedCityBlock.classList.add('active');
+                        this.citySelectItems.classList.add('select-hide');
+                        this.citySelectSelected.classList.remove('select-arrow-active');
+                        this.storesContainer.innerHTML = '';
+
+                        if (selectedCity) {
+                            this.updateStoresSelect(selectedCity);
+                            this.updateMapMarkers(this.skladi[selectedCity]);
+                        } else {
+                            this.updateMapMarkers(Object.values(this.skladi).flat());
+                        }
+                    });
+
+                    document.addEventListener('click', (e) => {
+                        if (!this.citySelectContainer.contains(e.target)) {
+                            this.citySelectItems.classList.add('select-hide');
+                            this.citySelectSelected.classList.remove('select-arrow-active');
+                        }
+                    });
+                }
+
+                initSelectedCityReset() {
+                    this.selectedCityReset.addEventListener('click', () => {
+                        this.selectedCityBlock.classList.remove('active');
+                        this.citySelectSelected.innerText = 'Выберите город';
+                        this.selectedCitySpan.innerText = '';
+                        this.storesContainer.innerHTML = '';
+
+                        const allStores = Object.values(this.skladi).flat();
+                        this.updateMapMarkers(allStores);
+                    });
+                }
+
+                updateStoresSelect(selectedCity) {
+                    const stores = this.skladi[selectedCity];
+                    const storeSelectContainer = document.createElement('div');
+                    storeSelectContainer.classList.add('custom-select');
+                    storeSelectContainer.id = 'storeSelectContainer';
+
+                    const storeSelectSelected = document.createElement('div');
+                    storeSelectSelected.classList.add('select-selected');
+                    storeSelectSelected.innerText = 'Выберите магазин';
+                    storeSelectContainer.appendChild(storeSelectSelected);
+
+                    const storeSelectItems = document.createElement('div');
+                    storeSelectItems.classList.add('select-items');
+                    stores.forEach((store, index) => {
+                        const item = document.createElement('div');
+                        item.innerText = store.magazin;
+                        item.setAttribute('data-value', index);
+                        item.setAttribute('data-id', store.id); // Добавляем атрибут data-id
+                        item.addEventListener('click', () => {
+                            storeSelectSelected.innerText = store.magazin;
+                            storeSelectItems.querySelectorAll('.same-as-selected').forEach(el => el.classList.remove('same-as-selected'));
+                            item.classList.add('same-as-selected');
+
+                            // Переход по ссылке
+                            window.location.href = `https://rat.ardoz.ru/${store.id}/`;
+                        });
+                        storeSelectItems.appendChild(item);
+                    });
+                    storeSelectContainer.appendChild(storeSelectItems);
+
+                    storeSelectSelected.addEventListener('click', () => {
+                        storeSelectItems.classList.toggle('select-hide');
+                        storeSelectSelected.classList.toggle('select-arrow-active');
+                    });
+
+                    document.addEventListener('click', (e) => {
+                        if (!storeSelectContainer.contains(e.target)) {
+                            storeSelectItems.classList.add('select-hide');
+                            storeSelectSelected.classList.remove('select-arrow-active');
+                        }
+                    });
+
+                    this.storesContainer.appendChild(storeSelectContainer);
+                }
+
+                createPlacemark(lat, lon, name, description, id) {
+                    const placemark = new ymaps.Placemark([lat, lon], {
+                        balloonContentHeader: `<div>${name}</div>`,
+                        balloonContentBody: `<div>${description}</div>`,
+                        balloonContentFooter: `<div><a class="mark-button" href="https://rat.ardoz.ru/${id}/" target="_blank">Выбрать</a></div>`
+                    });
+                    this.map.geoObjects.add(placemark);
+                    this.placemarks.push(placemark);
+                }
+
+                clearPlacemarks() {
+                    this.placemarks.forEach(placemark => {
+                        this.map.geoObjects.remove(placemark);
+                    });
+                    this.placemarks = [];
+                }
+
+                initTabs() {
+                    const _this = this; 
+                    const btns = $('.tab-btn__item');
+                    const contents = $('.tab-content__item');
+
+                    btns.each(function(index, element) {
+                        $(this).attr('data-index', index);
+                    });
+
+                    contents.each(function(index, element) {
+                        $(this).attr('data-index', index);
+                    });
+
+                    _this.selectedTab();
+                }
+
+                selectedTab() {
+                    const _this = this; 
+                    const btns = $('.tab-btn__item');
+                    const contents = $('.tab-content__item');
+
+                    btns.each(function() {
+                        $(this).on('click',function(){
+                            const index = $(this).attr('data-index');
+
+                            btns.removeClass('active');
+                            $(this).addClass('active');
+                            contents.hide();
+                            $(`.tab-content__item[data-index=${index}]`).show();
+
+                            if (index === "1") { // Если выбрана вкладка "Выбрать на карте"
+                                _this.checkYMaps(() => {
+                                    const selectedCity = $('#citySelectContainer .select-selected').text();
+                                    if (selectedCity && selectedCity !== 'Выберите город') {
+                                        const stores = _this.skladi[selectedCity];
+                                        _this.updateMapMarkers(stores);
+                                    } else {
+                                        const allStores = Object.values(_this.skladi).flat();
+                                        _this.updateMapMarkers(allStores);
+                                    }
+                                    // Обновите размеры карты после рендеринга
+                                    _this.map.container.fitToViewport();
+                                });
+                            }
+                        });
+                    });
+                }
+
+                checkYMaps(callback) {
+                    if (typeof ymaps !== 'undefined') {
+                        ymaps.ready(() => {
+                            this.initMap();
+                            if (callback) callback();
+                        });
+                    } else {
+                        setTimeout(() => this.checkYMaps(callback), 100);
+                    }
+                }
+            }
+
+            new StoreMap('map', 'citySelect', 'storesContainer', 'cityMapModal');
+        });
+</script>
+{/literal}
