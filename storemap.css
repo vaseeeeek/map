@@ -109,7 +109,7 @@
 }
 
 .select__item:not(:last-child) {
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 /* Стилизация для нашего кастомного селекта */
@@ -165,7 +165,7 @@
     border: 1px solid #9E233B;
     width: 100%;
     z-index: 99;
-    max-height: 150px;
+    max-height: 165px;
     overflow-y: auto;
 }
 
@@ -212,17 +212,70 @@
 .select-items {
     border-bottom-left-radius: 5px;
 }
+
+.remodal-close {
+    top: -40px;
+    background: #9e233b;
+    color: #fff;
+}
+.selected-city__name {
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    font-size: 12px;
+    color: #9e233b;
+    font-weight: 600;
+}
 @media (max-width: 768px) {
     .remodal {
         padding:10px;
         padding-top:35px;
     }
-    .remodal-close {
-        top: -40px;
-        background: #9e233b;
-        color: #fff;
-    }
     .tab-btn__item, .select-selected, .select-items div {
         font-style: 13px;
     }
+}
+#storeSearchInput {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+#storesContainer {
+    max-height: calc(80vh - 110px); /* Установите максимальную высоту контейнера */
+    overflow-y: auto; /* Добавьте вертикальный скроллбар, если содержимое превышает высоту */
+    padding-right: 10px; /* Добавьте отступ справа, чтобы скроллбар не перекрывал содержимое */
+}
+
+#storesContainer::-webkit-scrollbar {
+    width: 8px;
+}
+
+#storesContainer::-webkit-scrollbar-thumb {
+    background-color: #9E233B;
+    border-radius: 10px;
+}
+
+#storesContainer::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+#storeList .store-item {
+    padding: 10px;
+    border: 1px solid #ddd;
+    margin-bottom: 5px;
+    border-radius: 5px;
+}
+
+#storeList .store-item a {
+    text-decoration: none;
+    color: #000;
+    display: block;
+}
+
+#storeList .store-item a:hover {
+    color: #9E233B;
 }

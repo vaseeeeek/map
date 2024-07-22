@@ -21,6 +21,13 @@
             &#x2715;
         </div>
     </div>
+    {$cityName = $wa->param("gorod")}
+    {if $cityName}
+        <div class="selected-city__name">
+            <svg id="Layer_1_1_" fill="#9e233b" width="10px" style="enable-background:new 0 0 16 16;" version="1.1" viewBox="0 0 16 16" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M8,16c0,0,6-5.582,6-10s-2.686-6-6-6S2,1.582,2,6S8,16,8,16z M5,5c0-1.657,1.343-3,3-3s3,1.343,3,3S9.657,8,8,8S5,6.657,5,5  z"/></svg>
+            {$cityName}
+        </div>
+    {/if}
     <button data-remodal-action="close" class="remodal-close"></button>
     <div class="modal-content">
         <div class="tab-btn__list">
@@ -80,11 +87,11 @@
                 initMap() {
                     if (!this.map) {
                         this.map = new ymaps.Map(this.mapElementId, {
-                            center: [55.76, 37.64], // Координаты центра карты
+                            center: [55.76, 37.64], 
                             zoom: 10
                         });
 
-                        // Убедитесь, что карта обновляет свои размеры
+                        // сдвиг карты в область меток
                         this.map.container.fitToViewport();
                     }
                 }
@@ -147,6 +154,7 @@
                     });
                 }
 
+
                 initSelectedCityReset() {
                     this.selectedCityReset.addEventListener('click', () => {
                         this.selectedCityBlock.classList.remove('active');
@@ -161,49 +169,47 @@
 
                 updateStoresSelect(selectedCity) {
                     const stores = this.skladi[selectedCity];
-                    const storeSelectContainer = document.createElement('div');
-                    storeSelectContainer.classList.add('custom-select');
-                    storeSelectContainer.id = 'storeSelectContainer';
+                    
+                    // Добавляем строку поиска
+                    const storeSearchInput = document.createElement('input');
+                    storeSearchInput.type = 'text';
+                    storeSearchInput.id = 'storeSearchInput';
+                    storeSearchInput.placeholder = 'Поиск магазина...';
 
-                    const storeSelectSelected = document.createElement('div');
-                    storeSelectSelected.classList.add('select-selected');
-                    storeSelectSelected.innerText = 'Выберите магазин';
-                    storeSelectContainer.appendChild(storeSelectSelected);
+                    // Создаем контейнер для списка магазинов
+                    const storeList = document.createElement('div');
+                    storeList.id = 'storeList';
 
-                    const storeSelectItems = document.createElement('div');
-                    storeSelectItems.classList.add('select-items');
-                    stores.forEach((store, index) => {
-                        const item = document.createElement('div');
-                        item.innerText = store.magazin;
-                        item.setAttribute('data-value', index);
-                        item.setAttribute('data-id', store.id); // Добавляем атрибут data-id
-                        item.addEventListener('click', () => {
-                            storeSelectSelected.innerText = store.magazin;
-                            storeSelectItems.querySelectorAll('.same-as-selected').forEach(el => el.classList.remove('same-as-selected'));
-                            item.classList.add('same-as-selected');
+                    // Заполняем список магазинов
+                    stores.forEach(store => {
+                        const storeItem = document.createElement('div');
+                        storeItem.classList.add('store-item');
+                        storeItem.setAttribute('data-id', store.id); // Добавляем атрибут data-id
+                        storeItem.innerHTML = `<a href="https://rat.ardoz.ru/${store.id}/">${store.magazin}</a>`;
+                        storeList.appendChild(storeItem);
+                    });
 
-                            // Переход по ссылке
-                            window.location.href = `https://rat.ardoz.ru/${store.id}/`;
+                    // Очищаем контейнер и добавляем новый контент
+                    this.storesContainer.innerHTML = '';
+                    this.storesContainer.appendChild(storeSearchInput);
+                    this.storesContainer.appendChild(storeList);
+
+                    // Обработчик события ввода в строку поиска
+                    storeSearchInput.addEventListener('input', () => {
+                        const filter = storeSearchInput.value.toLowerCase();
+                        const storeItems = storeList.querySelectorAll('.store-item');
+
+                        storeItems.forEach(item => {
+                            const text = item.innerText.toLowerCase();
+                            if (text.includes(filter)) {
+                                item.style.display = '';
+                            } else {
+                                item.style.display = 'none';
+                            }
                         });
-                        storeSelectItems.appendChild(item);
                     });
-                    storeSelectContainer.appendChild(storeSelectItems);
-
-                    storeSelectSelected.addEventListener('click', () => {
-                        storeSelectItems.classList.toggle('select-hide');
-                        storeSelectSelected.classList.toggle('select-arrow-active');
-                    });
-
-                    document.addEventListener('click', (e) => {
-                        if (!storeSelectContainer.contains(e.target)) {
-                            storeSelectItems.classList.add('select-hide');
-                            storeSelectSelected.classList.remove('select-arrow-active');
-                        }
-                    });
-
-                    this.storesContainer.appendChild(storeSelectContainer);
                 }
-
+                
                 createPlacemark(lat, lon, name, description, id) {
                     const placemark = new ymaps.Placemark([lat, lon], {
                         balloonContentHeader: `<div>${name}</div>`,
